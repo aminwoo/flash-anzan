@@ -1,0 +1,16 @@
+@font-face {
+    font-family: 'ABACUS2';
+    src: url('/fonts/ABACUS2.woff') format('woff');
+    font-style: normal;
+  }
+
+.abacus-font {
+    font-family: 'ABACUS2', sans-serif;
+    font-weight: 700;
+}
+
+.number-area {
+    display: table-cell;
+    vertical-align: middle;
+    color: #32cd32;
+}
