@@ -1,18 +1,19 @@
-'use client'
+'use client';
 
 import { useState, useEffect, useRef } from 'react'
 import NumberDisplay from './ui/numberDisplay';
 
 export default function Home() {
 
-  const audioContext = new AudioContext();
 
-  const numWorkers = 5; 
+  const numWorkers = 5;  
   // Create a reference to the worker object.
   const worker = useRef(null);
+  const audioContext = useRef(null);
 
   // We use the `useEffect` hook to set up the worker as soon as the `App` component is mounted.
   useEffect(() => {
+    audioContext.current = new AudioContext();
     worker.current = []; 
     for (let i = 0; i < numWorkers; i++) {
       worker.current.push(new Worker(new URL('./worker.js', import.meta.url), {type: 'module'}));
@@ -21,17 +22,17 @@ export default function Home() {
   }, []);
 
   function createAudioBuffer(float32Array) {
-    const buffer = audioContext.createBuffer(1, float32Array.length, 16000);
+    const buffer = audioContext.current.createBuffer(1, float32Array.length, 16000);
     buffer.copyToChannel(float32Array, 0);
     return buffer;
   }
 
   function playAudioBuffer(buffer) {
     return new Promise((resolve) => {
-      const source = audioContext.createBufferSource();
+      const source = audioContext.current.createBufferSource();
       source.buffer = buffer;
       source.playbackRate.value = 1.2;
-      source.connect(audioContext.destination);
+      source.connect(audioContext.current.destination);
       source.onended = resolve; 
       source.start();
     });
