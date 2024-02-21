@@ -76,7 +76,7 @@ export default function Home() {
     for (let x of number) {
         paths.push(`sounds/numbers/${convert[x]}.wav`);
     }
-    await soundPlayer.current.createBuffer(paths, 300, 1);
+    await soundPlayer.current.createBuffer(paths, 1000, 1);
     soundPlayer.current.play(); 
     /*worker.onmessage = function(e) {
       switch (e.data.status) {
@@ -97,7 +97,7 @@ export default function Home() {
           Generate
         </button>
 
-        <NumberDisplay/>
+        <NumberDisplay nums={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}/>
     </div>
   )
 }

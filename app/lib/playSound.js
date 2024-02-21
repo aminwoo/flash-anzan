@@ -5,6 +5,11 @@ import Crunker from 'crunker';
 export class SoundPlayer {
     constructor() {
         this.crunker = new Crunker(); 
+        this.playing = false; 
+    }
+
+    isPlaying() {
+        return this.playing;
     }
 
     async createBuffer(paths, interval, count) {
@@ -46,15 +51,16 @@ export class SoundPlayer {
             sampleRate
         );
 
-        const originalData = audioBuffer.getChannelData(0);
+        const oldData = audioBuffer.getChannelData(0);
         const newData = newBuffer.getChannelData(0);
         for (let i = 0; i < r - l; i++) {
-            newData[i] = originalData[i + l];
+            newData[i] = oldData[i + l];
         }
         return newBuffer; 
     }
 
     play() {
+        this.playing = true; 
         this.crunker.play(this.buffer);
     }
 
