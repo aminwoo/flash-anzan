@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useRef } from 'react'
 import NumberDisplay from './ui/numberDisplay';
+import { play } from './lib/playSound';
+import { SoundPlayer } from './lib/playSound';
 
 export default function Home() {
-
 
   const numWorkers = 5;  
   // Create a reference to the worker object.
   const worker = useRef(null);
   const audioContext = useRef(null);
+  const soundPlayer = useRef(null); 
 
   // We use the `useEffect` hook to set up the worker as soon as the `App` component is mounted.
   useEffect(() => {
+    soundPlayer.current = new SoundPlayer(); 
     audioContext.current = new AudioContext();
     worker.current = []; 
     for (let i = 0; i < numWorkers; i++) {
@@ -57,8 +60,25 @@ export default function Home() {
     });
   };
 
-  const generate = (worker, text) => new Promise((resolve) => {
-    worker.onmessage = function(e) {
+  const generate = (worker, text) => new Promise(async (resolve) => {
+    //await soundPlayer.createBuffer(["sounds/src_public_sounds_tick.wav"], 300, 10);
+    const number = ['four hundred', 'eighty three', 'thousand', 'six hundred', 'forty seven'];
+    
+    let paths = []; 
+    let convert = {
+      'four hundred': "400",
+      'eighty three': "83",
+      "thousand": "thousand",
+      'six hundred': "600",
+      'forty seven': "47",
+    };
+
+    for (let x of number) {
+        paths.push(`sounds/numbers/${convert[x]}.wav`);
+    }
+    await soundPlayer.current.createBuffer(paths, 300, 1);
+    soundPlayer.current.play(); 
+    /*worker.onmessage = function(e) {
       switch (e.data.status) {
         case 'complete':
           resolve(e.data.output);
@@ -68,12 +88,12 @@ export default function Home() {
     
     worker.postMessage({
       text,
-    });
+    });*/
   });
 
   return (
     <div>
-        <button onClick={handleGenerateSpeech}>
+        <button onClick={generate}>
           Generate
         </button>
 
