@@ -1,5 +1,6 @@
 "use client";
 import {useState,useEffect,useRef,useCallback} from 'react';
+import Link from 'next/link';
 import {defaults,normalize,generate,type Settings} from './training';
 type Phase='idle'|'countdown'|'flash'|'gap'|'answer'|'result';
 type Round={values:number[];answer:number|null;total:number;correct:boolean;};
@@ -8,12 +9,12 @@ export default function Home(){
  const [settings,setSettings]=useState<Settings>(defaults),[loaded,setLoaded]=useState(false);
  const [phase,setPhase]=useState<Phase>('idle'),[paused,setPaused]=useState(false),[index,setIndex]=useState(0),[countdown,setCountdown]=useState(3),[values,setValues]=useState<number[]>([]),[answer,setAnswer]=useState(''),[round,setRound]=useState<Round|null>(null),[history,setHistory]=useState<Round[]>([]),[full,setFull]=useState(false),[error,setError]=useState('');
  const active=phase==='countdown'||phase==='flash'||phase==='gap';
- const settingsRef=useRef(settings);settingsRef.current=settings;
- const audio=useRef<AudioContext|null>(null);
- useEffect(()=>{try{const saved=localStorage.getItem('anzan-settings');if(saved)setSettings(normalize(JSON.parse(saved)));}catch{}setLoaded(true);return()=>{audio.current?.close();};},[]);
- useEffect(()=>{if(loaded)try{localStorage.setItem('anzan-settings',JSON.stringify(settings));}catch{}},[settings,loaded]);
+ const settingsRef=useRef(settings);useEffect(()=>{settingsRef.current=settings;},[settings]);
+ const audio=useRef<AudioContext|null>(null);const answerRef=useRef<HTMLInputElement|null>(null);useEffect(()=>{if(phase==='answer')answerRef.current?.focus();},[phase]);
+ useEffect(()=>{let cancelled=false;queueMicrotask(()=>{if(cancelled)return;try{const saved=localStorage.getItem('anzan-settings');if(saved)setSettings(normalize(JSON.parse(saved)));}catch{/* Use defaults if storage is unavailable. */}setLoaded(true);});return()=>{cancelled=true;audio.current?.close();};},[]);
+ useEffect(()=>{if(loaded)try{localStorage.setItem('anzan-settings',JSON.stringify(settings));}catch{/* Optional device feature is unavailable. */}},[settings,loaded]);
  const beep=useCallback(()=>{if(!settingsRef.current.sound||!audio.current)return;const ctx=audio.current,o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=660;g.gain.setValueAtTime(.035,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.06);o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.07);},[]);
- useEffect(()=>{if(!active||paused)return;const s=settingsRef.current;let ms=phase==='countdown'?1000:phase==='flash'?s.speed*1000:s.gap*1000;
+ useEffect(()=>{if(!active||paused)return;const s=settingsRef.current;const ms=phase==='countdown'?1000:phase==='flash'?s.speed*1000:s.gap*1000;
  const timer=setTimeout(()=>{
  if(phase==='countdown'){if(countdown>1)setCountdown(c=>c-1);else{setPhase('flash');beep();}}
  else if(phase==='flash'){if(index===values.length-1)setPhase('answer');else if(s.gap>0)setPhase('gap');else{setIndex(i=>i+1);beep();}}
@@ -21,20 +22,20 @@ export default function Home(){
  },ms);return()=>clearTimeout(timer);},[phase,index,countdown,paused,active,values.length,beep]);
  useEffect(()=>{const hide=()=>{if(document.hidden&&active)setPaused(true);};document.addEventListener('visibilitychange',hide);return()=>document.removeEventListener('visibilitychange',hide);},[active]);
  const start=useCallback((repeat=false)=>{const s=normalize(settingsRef.current);setSettings(s);setValues(repeat&&values.length?values:generate(s));setIndex(0);setAnswer('');setError('');setRound(null);setPaused(false);setCountdown(s.countdown);setPhase(s.countdown?'countdown':'flash');
- if(s.sound){try{audio.current??=new AudioContext();void audio.current.resume();}catch{}}
+ if(s.sound){try{audio.current??=new AudioContext();void audio.current.resume();}catch{/* Optional device feature is unavailable. */}}
  if(!s.countdown)beep();},[values,beep]);
  const stop=()=>{setPhase('idle');setPaused(false);setFull(false);};
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){setFull(false);if(active){setPaused(true);}return;}if((e.target as HTMLElement)?.closest('input,select,button,summary,textarea'))return;if(e.code==='Space'){e.preventDefault();if(active)setPaused(p=>!p);else if(phase==='idle'||phase==='result')start();}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[active,phase,start]);
  function update<K extends keyof Settings>(key:K,value:Settings[K]){setSettings(s=>({...s,[key]:value}));}
  function submit(skip=false){if(!skip&&(answer.trim()===''||!Number.isSafeInteger(Number(answer)))){setError('Enter a whole number, including a minus sign if needed.');return;}const total=values.reduce((a,b)=>a+b,0),entry={values:[...values],answer:skip?null:Number(answer),total,correct:!skip&&Number(answer)===total};setRound(entry);setHistory(h=>[entry,...h].slice(0,100));setPhase('result');setError('');}
  const correct=history.filter(h=>h.correct).length;
- return <main className={full?'fullscreen':''}><header><a className="brand" href="/">✳ <span>anzan<span className="brand-light">lab</span></span></a><span className="top-note">A little focus. A faster mind.</span></header>
+ return <main className={full?'fullscreen':''}><header><Link className="brand" href="/">✳ <span>anzan<span className="brand-light">lab</span></span></Link><span className="top-note">A little focus. A faster mind.</span></header>
  <section className="intro"><div className="eyebrow">YOUR DAILY MENTAL WORKOUT</div><h1>Make every number count.</h1><p>Find your rhythm. Hold the numbers. Discover what your mind can do.</p></section>
  <div className="workspace"><div><section className="stage" aria-label="Flash training area"><div className="stage-top"><span className="pill">FLASH ANZAN</span><span className="timer-label" aria-live="polite">{active?(phase==='countdown'?'Get ready':`${index+1} / ${values.length}`):phase==='answer'?'Your turn':phase==='result'?'Round complete':'Ready when you are'}</span><button className="secondary" onClick={()=>setFull(f=>!f)} aria-label={full?'Exit focus mode':'Enter focus mode'}>{full?'↙ Exit':'↗ Focus'}</button></div>
  <div className="display">
  {phase==='idle'&&<><span className="number">24</span><p>One number at a time. Add them in your mind.</p></>}
  {active&&(paused?<><span className="paused">Paused</span><p>Resume to see the current number again.</p></>:phase==='countdown'?<><span className="number">{countdown}</span><p>Take a breath. Get ready.</p></>:<span className={`number ${values[index]<0?'negative':''}`} style={{fontSize:full?undefined:`clamp(60px, 14vw, ${settings.fontSize}px)`,visibility:phase==='gap'?'hidden':'visible'}} key={index}>{signed(values[index])}</span>)}
- {phase==='answer'&&<form onSubmit={e=>{e.preventDefault();submit();}}><h2>What’s the total?</h2><p className="hint">Trust your mental math.</p><input className="answer" aria-label="Your answer" type="text" inputMode="text" autoFocus value={answer} onChange={e=>setAnswer(e.target.value)} placeholder="?" autoComplete="off"/><button className="primary" type="submit">Check answer →</button>{error&&<p className="error" role="alert">{error}</p>}</form>}
+ {phase==='answer'&&<form onSubmit={e=>{e.preventDefault();submit();}}><h2>What’s the total?</h2><p className="hint">Trust your mental math.</p><input className="answer" aria-label="Your answer" type="text" inputMode="text" ref={answerRef} value={answer} onChange={e=>setAnswer(e.target.value)} placeholder="?" autoComplete="off"/><button className="primary" type="submit">Check answer →</button>{error&&<p className="error" role="alert">{error}</p>}</form>}
  {phase==='result'&&round&&<><div className="eyebrow">{round.correct?'NICE WORK':'KEEP PRACTICING'}</div><div className="result-title">{round.correct?'Right on the number.':round.answer===null?'Here’s the total.':'Every round builds focus.'}</div><p>Your answer: <strong>{round.answer??'Skipped'}</strong> · Correct total: <strong>{round.total}</strong></p><details><summary>Review the numbers</summary><div className="review">{round.values.map((v,i)=><span key={i}>{signed(v)}</span>)}</div></details></>}
  </div><div className="controls">{phase==='idle'&&<button className="primary" onClick={()=>start()}>▶ Start practice</button>}{active&&<><button className="primary" onClick={()=>setPaused(p=>!p)}>{paused?'▶ Resume':'Ⅱ Pause'}</button><button className="secondary" onClick={stop}>Stop</button></>}{phase==='answer'&&<button className="secondary" onClick={()=>submit(true)}>Reveal answer</button>}{phase==='result'&&<><button className="primary" onClick={()=>start()}>Next round →</button><button className="secondary" onClick={()=>start(true)}>Repeat numbers</button></>}</div><div className="stage-foot">{active?'SPACE TO PAUSE · ESC TO LEAVE FOCUS':'SPACE TO START · BUILD YOUR FOCUS'}</div><div className="progress" aria-hidden="true"><div style={{width:active&&phase!=='countdown'?`${(index+1)/values.length*100}%`:phase==='answer'||phase==='result'?'100%':'0%'}}/></div></section>
  <section className="stats" aria-label="Session statistics"><div>Rounds<strong>{history.length}</strong></div><div>Correct<strong>{correct}</strong></div><div>Accuracy<strong>{history.length?Math.round(correct/history.length*100):0}%</strong></div><div>Practice time<strong>{(settings.count*(settings.speed+settings.gap)).toFixed(1)}s<span className="hint"> / round</span></strong></div></section><p className="hint">Add each signed number to a running total. A minus sign means subtract. Your settings are saved on this device; session scores reset on refresh.</p>

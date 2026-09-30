@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   openGraph: { images: ["/og.png"], title: "anzanlab — Flash Anzan", description: "Make every number count. Custom mental arithmetic practice." },
   twitter: { images: ["/og.png"], card: "summary_large_image", title: "anzanlab — Flash Anzan", description: "Make every number count." },
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
+    icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWMQyHb/DwADpgHBssCKRAAAAABJRU5ErkJggg==",
+    
   },
 };
 
