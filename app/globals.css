@@ -4,3 +4,5 @@
 .controls{flex-wrap:wrap}
 
 .result-mark{display:block;font-size:clamp(110px,15vw,160px);line-height:1;font-weight:700;margin-bottom:0}.result-mark.correct{color:#245b47}.result-mark.incorrect{color:#b1352d}.result-total{margin:4px 0}.result-total strong{display:block;font-size:clamp(58px,10vw,112px);line-height:1.1;letter-spacing:-3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.result-answer-label{display:block;font-size:14px;margin:6px 0}.stage:has(.result-feedback) .display{height:auto;min-height:305px;padding:20px 0}.result-feedback .result-title{font-size:20px}.fullscreen .stage:has(.result-feedback) .display{min-height:55vh}.fullscreen .result-mark{font-size:clamp(140px,20vh,220px)}.fullscreen .result-total strong{font-size:clamp(80px,16vw,180px)}kbd{border:1px solid #b9c8b2;background:#f5f6f0;padding:3px 7px;border-radius:5px;font-family:inherit}
+
+.header-actions{display:flex;align-items:center;gap:18px}
