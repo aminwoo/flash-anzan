@@ -1,18 +1,23 @@
 import type { Settings } from '../../training';
 import { getDb } from '../../../db';
-import { createLobby, publicLobby, startMatch, submitAnswer, timings, type Lobby } from '../../duel/game';
+import { createLobby, publicLobby, startMatch, changeSettings, submitAnswer, timings, upgradeLobby, type Lobby } from '../../duel/game';
 export const dynamic = 'force-dynamic';
 const cookieName = (id: string) => `anzan-duel-${id}`;
 const tokenFrom = (request: Request, id: string) => request.headers.get('cookie')?.split(';').map(c => c.trim()).find(c => c.startsWith(cookieName(id)+'='))?.split('=')[1] ?? null;
 const reply = (value: unknown, status = 200, cookie?: string) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', ...(cookie ? {'Set-Cookie':cookie} : {}) } });
 const cookie = (request: Request, id: string, token: string) => `${cookieName(id)}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400${new URL(request.url).protocol === 'https:' ? '; Secure' : ''}`;
 function database() { return getDb().$client; }
-async function read(id: string) {
+async function read(id: string): Promise<{room: Lobby; revision: number}> {
  if (!/^[a-f0-9]{16}$/.test(id)) throw new Error('Lobby not found.');
  const row = await database().prepare('SELECT state, revision FROM lobbies WHERE id = ?').bind(id).first<{state:string;revision:number}>();
  if (!row) throw new Error('Lobby not found.');
  const room = JSON.parse(row.state) as Lobby;
- if (Date.now() - room.created > 86400000) throw new Error('This lobby has expired. Create a new one.');
+ if (Date.now() - Math.max(room.created,...room.players.map(p=>p.seen)) > 86400000) throw new Error('This lobby has expired. Create a new one.');
+ if (upgradeLobby(room, Date.now())) {
+  const updated = await database().prepare('UPDATE lobbies SET state = ?, revision = revision + 1 WHERE id = ? AND revision = ?').bind(JSON.stringify(room), id, row.revision).run();
+  if (updated.meta.changes !== 1) return read(id);
+  return {room, revision:row.revision + 1};
+ }
  return {room, revision:row.revision};
 }
 async function update(id: string, fn: (room: Lobby) => void) {
@@ -35,7 +40,7 @@ export async function GET(request: Request) {
   let {room} = await read(id);
   const token = tokenFrom(request,id), me = room.players.find(p => p.token === token);
   if (me && Date.now()-me.seen > 5000) room = await update(id,r => { const player=r.players.find(p=>p.token===token); if(player)player.seen=Date.now(); });
-  return reply(publicLobby(room,token,Date.now()));
+  return reply(publicLobby(room,token,Date.now()),200,me&&token?cookie(request,id,token):undefined);
  } catch(error) { return errorResponse(error); }
 }
 export async function POST(request: Request) {
@@ -76,6 +81,10 @@ export async function POST(request: Request) {
     if(phase!=='waiting' && phase!=='finished')throw new Error('A match is in progress.');
     me.ready=body.ready===true;
    } else if(action==='start') startMatch(r,me,now);
+   else if(action==='settings') {
+    if(!body.settings||typeof body.settings!=='object'||Array.isArray(body.settings))throw new Error('Invalid settings.');
+    changeSettings(r,me,body.settings as Partial<Settings>,now);
+   }
    else if(action==='answer') {
     if(typeof body.round!=='number'||typeof body.match!=='number'||typeof body.answer!=='number') throw new Error('Invalid answer.');
     submitAnswer(r,me,body.round,body.match,body.answer,now);
