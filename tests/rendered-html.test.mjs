@@ -34,11 +34,10 @@ test('live 1v1: untimed answers, instant reveal, unlimited rounds, live settings
   assert.equal(created.status,201);const id=created.data.id,host=created.cookie;
   assert.ok(host);assert.equal(created.data.players.length,1);
   const invitation=await get(id);assert.equal(invitation.canJoin,true);assert.equal(invitation.me,null);assert.ok(!JSON.stringify(invitation).includes('token'));
+  assert.equal((await post({action:'start',id},host)).status,400);
   const joined=await post({action:'join',id,name:'Guest'});assert.equal(joined.status,200);const guest=joined.cookie;
   assert.equal((await post({action:'join',id,name:'Third'})).status,400);
   assert.equal((await post({action:'start',id})).status,400);
-  assert.equal((await post({action:'start',id},host)).status,400);
-  await post({action:'ready',id,ready:true},guest);
   assert.equal((await post({action:'start',id},guest)).status,400);
   const started=await post({action:'start',id},host);assert.equal(started.status,200);assert.equal(started.data.phase,'countdown');
   assert.equal(started.data.valuesRound,0);assert.equal(started.data.values.length,2);assert.deepEqual(started.data.results,[]);
@@ -100,7 +99,8 @@ test('live 1v1: untimed answers, instant reveal, unlimited rounds, live settings
   assert.equal((await post({action:'leave',id},guest)).status,200);
   const ended=await get(id,host);assert.equal(ended.phase,'finished');assert.equal(ended.forfeited,joined.data.me);
   assert.deepEqual(ended.players.map(p=>p.score),[12,6]);
-  await post({action:'ready',id,ready:true},host);await post({action:'ready',id,ready:true},guest);
+  assert.equal((await post({action:'start',id},host)).status,400);
+  await get(id,guest);
   const rematch=await post({action:'start',id},host);assert.equal(rematch.status,200);assert.equal(rematch.data.match,2);
   assert.deepEqual(rematch.data.players.map(p=>p.score),[0,0]);assert.equal(rematch.data.completed,0);
   assert.equal((await post({action:'answer',id,round:0,match:1,answer:0},host)).status,400);

@@ -68,7 +68,7 @@ export async function POST(request: Request) {
    const room = await update(id,r => {
     if (r.players.some(p=>p.token===token)) return;
     if (r.players.length>=2 || timings(r,Date.now()).phase!=='waiting') throw new Error('This lobby is full or a match is already in progress.');
-    r.players.push({id:crypto.randomUUID(),token:token!,name,ready:false,seen:Date.now(),answers:{}});
+    r.players.push({id:crypto.randomUUID(),token:token!,name,seen:Date.now(),answers:{}});
    });
    return reply(publicLobby(room,token,Date.now()),200,cookie(request,id,token));
   }
@@ -76,11 +76,7 @@ export async function POST(request: Request) {
    const me=r.players.find(p=>p.token===token);
    if(!me) throw new Error('Join the lobby first.');
    const now=Date.now(); me.seen=now;
-   if(action==='ready') {
-    const phase=timings(r,now).phase;
-    if(phase!=='waiting' && phase!=='finished')throw new Error('A match is in progress.');
-    me.ready=body.ready===true;
-   } else if(action==='start') startMatch(r,me,now);
+   if(action==='start') startMatch(r,me,now);
    else if(action==='settings') {
     if(!body.settings||typeof body.settings!=='object'||Array.isArray(body.settings))throw new Error('Invalid settings.');
     changeSettings(r,me,body.settings as Partial<Settings>,now);
@@ -91,7 +87,7 @@ export async function POST(request: Request) {
    }
    else if(action==='leave') {
     if(timings(r,now).phase==='waiting' && me.id!==r.players[0].id) r.players=r.players.filter(p=>p.id!==me.id);
-    else { r.forfeited=me.id; r.finishedAt=now; r.players.forEach(p=>{p.ready=false;}); }
+    else { r.forfeited=me.id; r.finishedAt=now; }
     me.seen=0;
    } else throw new Error('Invalid lobby action.');
   });

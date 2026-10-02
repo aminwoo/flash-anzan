@@ -3,7 +3,7 @@ import { generate, normalize, type Settings } from '../training';
 export const REVIEW_MS = 4000;
 export const READY_MS = 5000;
 export const ONLINE_MS = 20000;
-export type Player = { id: string; token: string; name: string; ready: boolean; seen: number; answers: Record<number, number> };
+export type Player = { id: string; token: string; name: string; seen: number; answers: Record<number, number> };
 export type Lobby = {
  id: string; created: number; settings: Settings; players: Player[]; sets: number[][];
  startsAt: number | null; roundStarts: number[]; roundSettings: Settings[]; revealedAt: number[];
@@ -66,14 +66,14 @@ export function upgradeLobby(room: Lobby, now: number) {
  return true;
 }
 export function createLobby(id: string, token: string, name: string, settings: Partial<Settings>, now: number): Lobby {
- return { id, created: now, settings: normalize(settings), players: [{ id: crypto.randomUUID(), token, name, ready: true, seen: now, answers: {} }], sets: [], startsAt: null, roundStarts: [], roundSettings: [], revealedAt: [], forfeited: null, finishedAt: null, match: 0 };
+ return { id, created: now, settings: normalize(settings), players: [{ id: crypto.randomUUID(), token, name, seen: now, answers: {} }], sets: [], startsAt: null, roundStarts: [], roundSettings: [], revealedAt: [], forfeited: null, finishedAt: null, match: 0 };
 }
 export function startMatch(room: Lobby, actor: Player, now: number) {
  if (actor.id !== room.players[0].id) throw new Error('Only the host can start the session.');
  const phase = timings(room, now).phase;
  if (phase !== 'waiting' && phase !== 'finished') throw new Error('A session is already in progress.');
- if (room.players.length !== 2 || room.players.some(p => !p.ready || now - p.seen > ONLINE_MS)) throw new Error('Both players need to be online and ready.');
- room.players.forEach(p => { p.answers = {}; p.ready = false; });
+ if (room.players.length !== 2 || room.players.some(p => now - p.seen > ONLINE_MS)) throw new Error('Both players need to be online.');
+ room.players.forEach(p => { p.answers = {}; });
  room.sets = []; room.roundStarts = []; room.roundSettings = []; room.revealedAt = [];
  room.startsAt = now + READY_MS; room.forfeited = null; room.finishedAt = null; room.match++;
  prepareRound(room,0,room.startsAt);
@@ -106,7 +106,7 @@ export function publicLobby(room: Lobby, token: string | null, now: number) {
  const time = timings(room, now);
  const completed = room.revealedAt.length;
  const results = room.sets.slice(0, completed).map((values, round) => ({ round, total: values.reduce((a,b) => a+b, 0), answers: room.players.map(p => p.answers[round] ?? null) }));
- const players = room.players.map(p => ({ id: p.id, name: p.name, ready: p.ready, online: now-p.seen <= ONLINE_MS, score: results.filter(r => p.answers[r.round] === r.total).length, submitted: Object.hasOwn(p.answers, time.round) }));
+ const players = room.players.map(p => ({ id: p.id, name: p.name, online: now-p.seen <= ONLINE_MS, score: results.filter(r => p.answers[r.round] === r.total).length, submitted: Object.hasOwn(p.answers, time.round) }));
  // Player secrets, future sets and unrevealed results never leave the server.
  if (!me) return { id: room.id, players: players.map(p => ({ id: p.id, name: p.name })), canJoin: room.players.length < 2 && time.phase === 'waiting', phase: time.phase, settings: room.settings, me: null, serverNow: now };
  const valuesRound = time.phase === 'review' ? time.round + 1 : time.round;
