@@ -47,7 +47,7 @@ test('signed numbers, zeros, large numbers and totals map to existing recordings
  assert.throws(() => recordingParts(1.5));
  assert.throws(() => recordingParts(Infinity));
  const vocabulary = [...Array.from({ length: 100 }, (_, n) => String(n)), ...Array.from({ length: 9 }, (_, n) => String((n + 1) * 100)), 'minus', 'thousand', 'million', 'billion', 'trillion', 'quadrillion'];
- await Promise.all(vocabulary.map(key => access(new URL(`../public/number-voice/v1/${key}.mp3`, import.meta.url))));
+ await Promise.all(vocabulary.map(key => access(new URL(`../public/number-voice/v2/${key}.mp3`, import.meta.url))));
 });
 
 test('concurrent and repeated numbers reuse one decoded recording and survive a reload offline', async () => {
@@ -66,13 +66,13 @@ test('concurrent and repeated numbers reuse one decoded recording and survive a 
 
 test('preloaded replay needs no fetch and resolves only when the full recording ends', async () => {
  const calls = [], context = engine(), player = new NumberRecordings(context, fetcher(calls), storage(), origin);
- await player.prepare([24, -24, 24, 0]);
+ await player.prepare([24, -24, 24, 0], 1.5);
  const count = calls.length;
  let finished = false;
  const playing = player.play(24, 1.5).then(() => { finished = true; });
  await new Promise(resolve => setImmediate(resolve));
  assert.equal(calls.length, count);
- assert.equal(context.sources[0].playbackRate.value, 1.5);
+ assert.equal(context.sources[0].playbackRate.value, 1);
  assert.equal(finished, false);
  context.sources[0].onended(); await playing;
  assert.equal(finished, true);
@@ -105,7 +105,7 @@ test('cache size is bounded and cached WAV data retains signed PCM', async () =>
  for (let n = 0; n < 140; n++) await player.getNumber(n);
  await player.writes;
  assert.equal(player.numbers.size, 128);
- assert.equal((await (await cache.open('anzan-voice-numbers-v1')).keys()).length, 128);
+ assert.equal((await (await cache.open('anzan-voice-numbers-v2')).keys()).length, 128);
  const bytes = encodeRecording(buffer([-1, 0, 1], 22050)), view = new DataView(bytes);
  assert.equal(view.getUint32(24, true), 22050);
  assert.equal(view.getInt16(44, true), -32768);

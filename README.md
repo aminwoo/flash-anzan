@@ -4,16 +4,18 @@ Flash Anzan supports optional number read-aloud in solo practice and live duels.
 Enable **Read numbers aloud** in the settings, choose an English voice and speech
 rate, and use **Test voice** to preview it. Voice preferences are saved on this
 device; duel preferences apply only to the individual player. The default
-**Recorded English** voice uses bundled audio, preloads each round (including
+**Recorded American English** voice uses bundled audio, preloads each round (including
 its answer), and caches complete signed numbers in memory and on this device
 across reloads. Playback does not call a speech service or require an API key.
-The cache retains up to 128 complete numbers; its small vocabulary of reusable
+Speaking speed is processed before playback without changing pitch, and the
+processed audio is cached by number and speed. The cache retains up to 128
+complete recordings; its small vocabulary of reusable
 recordings is cached separately. Storage restrictions fall back to memory caching.
 Optional browser voices remain available but cannot cache their generated audio.
 Negative numbers are read with “minus”. Each number waits for both its minimum
 display time and the complete spoken audio before advancing. Speech stops on
 pause, stop, navigation, or when the tab is hidden. Regenerate the bundled voice
-with `scripts/generate-number-recordings.py`; model attribution is in
+with `scripts/generate-american-recordings.py`; model attribution is in
 `public/number-voice/README.md`.
 
 A clean full-stack starter running on

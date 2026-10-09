@@ -1,4 +1,5 @@
-export const RECORDED_VOICE = 'anzan-recorded-english-v1';
+import { stretchRecording } from './voice-tempo.mjs';
+export const RECORDED_VOICE = 'anzan-recorded-american-v2';
 const SCALES = ['', 'thousand', 'million', 'billion', 'trillion', 'quadrillion'];
 const LIMIT = 128;
 
@@ -39,14 +40,14 @@ export class NumberRecordings {
   this.parts = new Map(); this.numbers = new Map(); this.sequence = 0; this.playing = null;
   this.writes = Promise.resolve();
   const open = name => Promise.resolve().then(() => cacheStorage?.open(name)).catch(() => null);
-  this.sourceCache = open('anzan-voice-parts-v1'); this.numberCache = open('anzan-voice-numbers-v1');
+  this.sourceCache = open('anzan-voice-parts-v2'); this.numberCache = open('anzan-voice-numbers-v2');
  }
  unlock() { return this.context.resume(); }
  async readCache(cache, url) { try { return await cache?.match(url); } catch { return null; } }
  async loadPart(key) {
   if (this.parts.has(key)) return this.parts.get(key);
   const pending = (async () => {
-   const url = new URL(`/number-voice/v1/${key}.mp3`, this.origin).href;
+   const url = new URL(`/number-voice/v2/${key}.mp3`, this.origin).href;
    const cache = await this.sourceCache;
    let response = await this.readCache(cache, url);
    if (!response) {
@@ -68,19 +69,26 @@ export class NumberRecordings {
    for (const key of keys.slice(0, Math.max(0, keys.length - LIMIT))) await cache.delete(key);
   }).catch(() => { /* Optional persistent storage; keep using decoded memory audio. */ });
  }
- async getNumber(value) {
-  if (this.numbers.has(value)) {
-   const pending = this.numbers.get(value); this.numbers.delete(value); this.numbers.set(value, pending);
+ async getNumber(value, rate = 1) {
+  if (!Number.isFinite(rate) || rate < 0.5 || rate > 3) throw new Error('Invalid speech rate.');
+  const key = `${value}:${rate}`;
+  if (this.numbers.has(key)) {
+   const pending = this.numbers.get(key); this.numbers.delete(key); this.numbers.set(key, pending);
    return pending;
   }
   const pending = (async () => {
    const keys = recordingParts(value);
    const cache = await this.numberCache;
-   const url = new URL(`/number-voice/v1/cached/${value}.wav`, this.origin).href;
+   const url = new URL(`/number-voice/v2/cached/${value}-${rate}.wav`, this.origin).href;
    const saved = await this.readCache(cache, url);
    if (saved) {
     try { return await this.context.decodeAudioData(await saved.arrayBuffer()); }
     catch { try { await cache?.delete(url); } catch { /* Rebuild a damaged cache entry. */ } }
+   }
+   if (rate !== 1) {
+    const buffer = stretchRecording(await this.getNumber(value), rate, this.context);
+    this.numbers.delete(`${value}:1`);
+    this.saveNumber(cache, url, buffer); return buffer;
    }
    const parts = await Promise.all(keys.map(key => this.loadPart(key)));
    const pause = Math.round(this.context.sampleRate * 0.02);
@@ -91,25 +99,25 @@ export class NumberRecordings {
    this.saveNumber(cache, url, buffer);
    return buffer;
   })();
-  this.numbers.set(value, pending);
+  this.numbers.set(key, pending);
   while (this.numbers.size > LIMIT) this.numbers.delete(this.numbers.keys().next().value);
-  try { return await pending; } catch (error) { this.numbers.delete(value); throw error; }
+  try { return await pending; } catch (error) { this.numbers.delete(key); throw error; }
  }
- async prepare(values) {
+ async prepare(values, rate = 1) {
   const remaining = [...new Set(values)];
   await Promise.all(Array.from({ length: Math.min(6, remaining.length) }, async () => {
-   while (remaining.length) await this.getNumber(remaining.pop());
+   while (remaining.length) await this.getNumber(remaining.pop(), rate);
   }));
  }
  async play(value, rate) {
   this.cancel();
   const sequence = this.sequence;
-  const buffer = await this.getNumber(value);
+  const buffer = await this.getNumber(value, rate);
   if (sequence !== this.sequence) return;
   await this.unlock();
   if (sequence !== this.sequence) return;
   await new Promise((resolve, reject) => {
-   const source = this.context.createBufferSource(); source.buffer = buffer; source.playbackRate.value = rate;
+   const source = this.context.createBufferSource(); source.buffer = buffer; source.playbackRate.value = 1;
    source.connect(this.context.destination);
    const done = () => { source.disconnect(); if (this.playing?.source === source) this.playing = null; resolve(); };
    this.playing = { source, done }; source.onended = done;
