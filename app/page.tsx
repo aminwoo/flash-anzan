@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- Use full page navigation for mode changes because client routing fails on the hosted app. */
 import {useState,useEffect,useRef,useCallback} from 'react';
 import {defaults,normalize,generate,type Settings} from './training';
+import {SpeechControls,useNumberSpeech} from './number-speech';
 type Phase='idle'|'countdown'|'flash'|'gap'|'answer'|'result';
 type Round={values:number[];answer:number|null;total:number;correct:boolean;};
 const signed=(n:number)=>n<0?'−'+Math.abs(n):String(n);
@@ -10,6 +11,10 @@ export default function Home(){
  const [phase,setPhase]=useState<Phase>('idle'),[paused,setPaused]=useState(false),[index,setIndex]=useState(0),[countdown,setCountdown]=useState(3),[values,setValues]=useState<number[]>([]),[round,setRound]=useState<Round|null>(null),[history,setHistory]=useState<Round[]>([]),[full,setFull]=useState(false);
  const active=phase==='countdown'||phase==='flash'||phase==='gap';
  const settingsRef=useRef(settings);useEffect(()=>{settingsRef.current=settings;},[settings]);
+ const reader=useNumberSpeech();
+ const spoken=useRef<{values:number[];index:number}|null>(null);
+ const {speak,cancel:cancelSpeech}=reader;
+ useEffect(()=>{if(paused||!settings.speech||!active){cancelSpeech();spoken.current=null;return;}if(phase==='flash'&&(spoken.current?.values!==values||spoken.current?.index!==index)){speak(values[index],settings);spoken.current={values,index};}},[phase,index,values,paused,active,settings,speak,cancelSpeech]);
  const audio=useRef<AudioContext|null>(null);
  const beepBytes=useRef<ArrayBuffer|null>(null),beepBuffer=useRef<AudioBuffer|null>(null);
  useEffect(()=>{const controller=new AbortController();void fetch('/number-beep.wav',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Audio unavailable');return r.arrayBuffer();}).then(bytes=>{beepBytes.current=bytes;}).catch(()=>{/* Generated beep remains available as fallback. */});return()=>controller.abort();},[]);
@@ -25,10 +30,10 @@ export default function Home(){
  else{setIndex(i=>i+1);setPhase('flash');beep();}
  },ms);return()=>clearTimeout(timer);},[phase,index,countdown,paused,active,values.length,beep]);
  useEffect(()=>{const hide=()=>{if(document.hidden&&(active||phase==='result'))setPaused(true);};document.addEventListener('visibilitychange',hide);return()=>document.removeEventListener('visibilitychange',hide);},[active,phase]);
- const start=useCallback((repeat=false)=>{const s=normalize(settingsRef.current);setSettings(s);setValues(repeat&&values.length?values:generate(s));setIndex(0);setRound(null);setPaused(false);setCountdown(s.countdown);setPhase(s.countdown?'countdown':'flash');
+ const start=useCallback((repeat=false)=>{const s=normalize(settingsRef.current);const nextValues=repeat&&values.length?values:generate(s);cancelSpeech();spoken.current=null;setSettings(s);setValues(nextValues);setIndex(0);setRound(null);setPaused(false);setCountdown(s.countdown);setPhase(s.countdown?'countdown':'flash');
  if(s.sound){try{audio.current??=new AudioContext();void audio.current.resume();}catch{/* Optional device feature is unavailable. */}}
- if(!s.countdown)beep();},[values,beep]);
- const stop=()=>{setPhase('idle');setPaused(false);setFull(false);};
+ if(!s.countdown){beep();speak(nextValues[0],s);spoken.current={values:nextValues,index:0};}},[values,beep,speak,cancelSpeech]);
+ const stop=()=>{cancelSpeech();setPhase('idle');setPaused(false);setFull(false);};
 
  function update<K extends keyof Settings>(key:K,value:Settings[K]){setSettings(s=>({...s,[key]:value}));}
  const reveal=useCallback(()=>{const total=values.reduce((a,b)=>a+b,0);const entry={values:[...values],answer:null,total,correct:false};setRound(entry);setHistory(h=>[entry,...h].slice(0,100));setPhase('result');playSound('reveal');},[values,playSound]);
@@ -49,6 +54,7 @@ export default function Home(){
  <label className="check"><input type="checkbox" checked={settings.continuous} onChange={e=>update('continuous',e.target.checked)}/>Continuous mode</label><p className="hint">Stay on a black screen for the whole session. Space reveals the answer, then starts the next round. R replays the same set. Escape returns to settings.</p>
  <label>Number mode<select value={settings.mode} onChange={e=>update('mode',e.target.value as Settings['mode'])}><option value="positive">Addition only (+)</option><option value="mixed">Positive & negative (+ / −)</option><option value="negative">Negative only (−)</option></select></label>
  {settings.mode==='mixed'&&<><label>Chance of a negative number: {settings.negativePercent}%<input type="range" min="0" max="100" step="5" value={settings.negativePercent} onChange={e=>update('negativePercent',Number(e.target.value))}/></label><label className="check"><input type="checkbox" checked={settings.nonNegative} onChange={e=>update('nonNegative',e.target.checked)}/>Keep running total at zero or above</label>{settings.nonNegative&&<p className="hint">Negative numbers are limited by the current total, so their frequency may be lower.</p>}</>}
+ <SpeechControls settings={settings} reader={reader} onChange={patch=>setSettings(s=>({...s,...patch}))}/>
  <details><summary>Timing & display</summary><div className="split"><label>Blank gap (seconds)<input type="number" min="0" max="3" step="0.05" value={settings.gap} onChange={e=>update('gap',Number(e.target.value))} onBlur={()=>setSettings(normalize(settings))}/></label></div><label>Number size: {settings.fontSize}px<input type="range" min="60" max="220" step="10" value={settings.fontSize} onChange={e=>update('fontSize',Number(e.target.value))}/></label><label className="check"><input type="checkbox" checked={settings.mixedDigits} onChange={e=>update('mixedDigits',e.target.checked)}/>Mix digit lengths (1 to {settings.digits})</label><label className="check"><input type="checkbox" checked={settings.sound} onChange={e=>update('sound',e.target.checked)}/>Enable sounds</label><p className="hint">Hear a short competition-style beep for each number and a chime when revealing the answer. A blank gap separates repeated numbers.</p></details><button className="secondary" style={{width:'100%',marginTop:20}} onClick={()=>setSettings(defaults)}>Reset settings</button></fieldset>{(active||phase==='answer')&&<p className="hint">Finish or stop the round to change settings.</p>}</aside></div>
  <footer>Small sessions. Lasting progress.<span>Inspired by the art of mental arithmetic.</span></footer></main>;
 }

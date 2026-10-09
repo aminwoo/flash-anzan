@@ -21,7 +21,8 @@ test('live 1v1: untimed answers, instant reveal, unlimited rounds, live settings
   await db.prepare(sql.trim()).run();
   for(const [path,text] of [['/','Make every number count.'],['/duel','Two minds. One challenge.']]) {
    const response=await mf.dispatchFetch(`http://localhost${path}`);
-   assert.equal(response.status,200); assert.match(await response.text(),new RegExp(text));
+   assert.equal(response.status,200); const html=await response.text(); assert.match(html,new RegExp(text));
+   assert.match(html,/Read numbers aloud/);
   }
   const post=async (body,cookie='')=>{
    const response=await mf.dispatchFetch('http://localhost/api/lobbies',{method:'POST',headers:{'Content-Type':'application/json',cookie,origin:'http://localhost'},body:JSON.stringify(body)});
