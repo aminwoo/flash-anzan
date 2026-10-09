@@ -46,7 +46,7 @@ export function SpeechControls({ settings, onChange, reader, disabled = false }:
    <label>Voice<select disabled={disabled} value={reader.voices.some(v => v.voiceURI === settings.speechVoice) ? settings.speechVoice : ''} onChange={e => onChange({ speechVoice: e.target.value })}><option value="">Automatic English voice</option>{reader.voices.map(v => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}</select></label>
    <label>Speech rate: {settings.speechRate.toFixed(1)}×<input disabled={disabled} type="range" min="0.5" max="3" step="0.1" value={settings.speechRate} onChange={e => onChange({ speechRate: Number(e.target.value) })}/></label>
    <button className="secondary" disabled={disabled || reader.supported !== true} onClick={() => reader.speak(-24, settings)}>Test voice</button>
-   <p className="hint">Reads each number, including “minus” for negatives. Increase seconds per number or speech rate if words are cut short.</p>
+   <p className="hint">Reads each number and the revealed answer, including “minus” for negatives. Increase seconds per number or speech rate if words are cut short.</p>
   </>}
   {reader.error && <p className="error" role="status">{reader.error}</p>}
  </div>;

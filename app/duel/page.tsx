@@ -45,6 +45,14 @@ export default function Duel() {
  const players=member?.players ?? [], opponent=players.find(p=>p.id!==member?.me);
  const isHost=member?.host===member?.me;
  const latest=member?.results.at(-1);
+ const spokenAnswer=useRef('');
+ const answerKey=member&&latest?`${member.id}:${member.match}:${latest.round}`:'';
+ const revealedTotal=phase==='review'&&latest?.round===time?.round?latest?.total:undefined;
+ const {speak,cancel:cancelSpeech}=reader;
+ useEffect(()=>{
+  if(!speechSettings.speech||phase!=='review'){if(phase!=='flash')cancelSpeech();return;}
+  if(revealedTotal!==undefined&&spokenAnswer.current!==answerKey){spokenAnswer.current=answerKey;speak(revealedTotal,speechSettings);}
+ },[phase,revealedTotal,answerKey,speechSettings,speak,cancelSpeech]);
  const sameRound=member?.time.round===time?.round && member?.phase===phase;
  const remaining=time ? Math.max(0,Math.ceil(((time.endsAt??now)-now)/1000)) : 0;
  const canStart=players.length===2&&players.every(p=>'online' in p&&p.online)&&connected;
