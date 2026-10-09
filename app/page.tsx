@@ -12,9 +12,9 @@ export default function Home(){
  const active=phase==='countdown'||phase==='flash'||phase==='gap';
  const settingsRef=useRef(settings);useEffect(()=>{settingsRef.current=settings;},[settings]);
  const reader=useNumberSpeech();
- const spoken=useRef<{values:number[];index:number}|null>(null);
+ const spoken=useRef<{values:number[];index:number;finished:Promise<void>}|null>(null);
  const {speak,cancel:cancelSpeech}=reader;
- useEffect(()=>{if(paused||!settings.speech||(!active&&phase!=='result')){cancelSpeech();spoken.current=null;return;}if(phase==='flash'&&(spoken.current?.values!==values||spoken.current?.index!==index)){speak(values[index],settings);spoken.current={values,index};}},[phase,index,values,paused,active,settings,speak,cancelSpeech]);
+ useEffect(()=>{if(paused||!settings.speech||(!active&&phase!=='result')){cancelSpeech();spoken.current=null;return;}if(phase==='flash'&&(spoken.current?.values!==values||spoken.current?.index!==index)){spoken.current={values,index,finished:speak(values[index],settings)};}},[phase,index,values,paused,active,settings,speak,cancelSpeech]);
  const audio=useRef<AudioContext|null>(null);
  const beepBytes=useRef<ArrayBuffer|null>(null),beepBuffer=useRef<AudioBuffer|null>(null);
  useEffect(()=>{const controller=new AbortController();void fetch('/number-beep.wav',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Audio unavailable');return r.arrayBuffer();}).then(bytes=>{beepBytes.current=bytes;}).catch(()=>{/* Generated beep remains available as fallback. */});return()=>controller.abort();},[]);
@@ -24,15 +24,18 @@ export default function Home(){
  const playSound=useCallback((kind:'number'|'correct'|'wrong'|'reveal')=>{if(!settingsRef.current.sound)return;try{audio.current??=new AudioContext();const ctx=audio.current;if(kind==='number'&&beepBytes.current){void ctx.resume().then(async()=>{const buffer=beepBuffer.current??await ctx.decodeAudioData(beepBytes.current!.slice(0));beepBuffer.current=buffer;const source=ctx.createBufferSource(),gain=ctx.createGain();source.buffer=buffer;source.connect(gain);gain.connect(ctx.destination);const duration=Math.min(buffer.duration,settingsRef.current.speed*.9);gain.gain.setValueAtTime(1,ctx.currentTime);gain.gain.setValueAtTime(1,ctx.currentTime+Math.max(0,duration-.005));gain.gain.linearRampToValueAtTime(0,ctx.currentTime+duration);source.start();source.stop(ctx.currentTime+duration);}).catch(()=>{/* Sound is optional. */});return;}const notes=kind==='correct'?[523,659,784]:kind==='wrong'?[220,165]:kind==='reveal'?[440,523]:[512];void ctx.resume().then(()=>{notes.forEach((frequency,i)=>{const o=ctx.createOscillator(),g=ctx.createGain(),at=ctx.currentTime+i*.12,duration=kind==='number'?Math.min(.09,settingsRef.current.speed*.65):.2;o.type=kind==='wrong'?'triangle':'sine';o.frequency.value=frequency;g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(kind==='number'?.12:.08,at+.003);if(kind==='number')g.gain.setValueAtTime(.12,at+Math.max(.004,duration-.006));g.gain.exponentialRampToValueAtTime(.0001,at+duration);o.connect(g);g.connect(ctx.destination);o.start(at);o.stop(at+duration+.01);});}).catch(()=>{/* Sound is optional. */});}catch{/* Sound is optional. */}},[]);
  const beep=useCallback(()=>playSound('number'),[playSound]);
  useEffect(()=>{if(!active||paused)return;const s=settingsRef.current;const ms=phase==='countdown'?1000:phase==='flash'?s.speed*1000:s.gap*1000;
- const timer=setTimeout(()=>{
+ let stopped=false;
+ const timer=setTimeout(async()=>{
+ if(phase==='flash')await spoken.current?.finished;
+ if(stopped)return;
  if(phase==='countdown'){if(countdown>1)setCountdown(c=>c-1);else{setPhase('flash');beep();}}
  else if(phase==='flash'){if(index===values.length-1)setPhase('answer');else if(s.gap>0)setPhase('gap');else{setIndex(i=>i+1);beep();}}
  else{setIndex(i=>i+1);setPhase('flash');beep();}
- },ms);return()=>clearTimeout(timer);},[phase,index,countdown,paused,active,values.length,beep]);
+ },ms);return()=>{stopped=true;clearTimeout(timer);};},[phase,index,countdown,paused,active,values.length,beep]);
  useEffect(()=>{const hide=()=>{if(document.hidden&&(active||phase==='result'))setPaused(true);};document.addEventListener('visibilitychange',hide);return()=>document.removeEventListener('visibilitychange',hide);},[active,phase]);
  const start=useCallback((repeat=false)=>{const s=normalize(settingsRef.current);const nextValues=repeat&&values.length?values:generate(s);cancelSpeech();spoken.current=null;setSettings(s);setValues(nextValues);setIndex(0);setRound(null);setPaused(false);setCountdown(s.countdown);setPhase(s.countdown?'countdown':'flash');
  if(s.sound){try{audio.current??=new AudioContext();void audio.current.resume();}catch{/* Optional device feature is unavailable. */}}
- if(!s.countdown){beep();speak(nextValues[0],s);spoken.current={values:nextValues,index:0};}},[values,beep,speak,cancelSpeech]);
+ if(!s.countdown){beep();spoken.current={values:nextValues,index:0,finished:speak(nextValues[0],s)};}},[values,beep,speak,cancelSpeech]);
  const stop=()=>{cancelSpeech();setPhase('idle');setPaused(false);setFull(false);};
 
  function update<K extends keyof Settings>(key:K,value:Settings[K]){setSettings(s=>({...s,[key]:value}));}

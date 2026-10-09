@@ -2,6 +2,25 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { advancePlayback } from '../app/duel/playback.mjs';
 
+test('delayed speech holds the number past its timer and finishes before gaps or the answer', () => {
+ let state={index:0,visible:true,finished:false,deadline:100};
+ assert.strictEqual(advancePlayback(state,5000,2,100,150,false),state);
+ state=advancePlayback(state,5100,2,100,150,true);
+ assert.equal(state.visible,false);assert.equal(state.deadline,5250);
+ state=advancePlayback(state,5250,2,100,150,true);
+ assert.equal(state.index,1);assert.equal(state.visible,true);
+ assert.strictEqual(advancePlayback(state,9000,2,100,150,false),state);
+ assert.equal(advancePlayback(state,9000,2,100,150,true).finished,true);
+});
+
+test('completed speech still waits for the minimum display time with no gap', () => {
+ const state={index:0,visible:true,finished:false,deadline:1000};
+ assert.strictEqual(advancePlayback(state,500,2,1000,0,true),state);
+ assert.strictEqual(advancePlayback(state,2000,2,1000,0,false),state);
+ const next=advancePlayback(state,2000,2,1000,0,true);
+ assert.equal(next.index,1);assert.equal(next.deadline,3000);
+});
+
 test('the first numbers get their full duration, including after a delayed frame', () => {
  let state={index:0,visible:true,finished:false,deadline:1000};
  assert.strictEqual(advancePlayback(state,999,3,1000,0),state);

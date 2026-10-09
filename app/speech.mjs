@@ -5,8 +5,9 @@
  * @param {SpeechSynthesis} synthesis
  * @param {typeof SpeechSynthesisUtterance} Utterance
  * @param {(event: SpeechSynthesisErrorEvent) => void} onError
+ * @param {() => void} [onEnd]
  */
-export function speakNumber(value, settings, synthesis, Utterance, onError) {
+export function speakNumber(value, settings, synthesis, Utterance, onError, onEnd) {
  synthesis.cancel();
  const utterance = new Utterance(value < 0 ? `minus ${Math.abs(value)}` : String(value));
  const voices = synthesis.getVoices();
@@ -17,6 +18,7 @@ export function speakNumber(value, settings, synthesis, Utterance, onError) {
  if (voice) utterance.voice = voice;
  utterance.rate = settings.speechRate;
  utterance.onerror = onError;
+ utterance.onend = onEnd ?? null;
  synthesis.speak(utterance);
  return utterance;
 }

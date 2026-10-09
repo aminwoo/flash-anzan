@@ -11,6 +11,18 @@ function speechEngine(voices = []) {
 }
 class Utterance { constructor(text) { this.text = text; } }
 
+test('speech completion follows the utterance end event, including a delayed voice', () => {
+ const engine = speechEngine();
+ let finished = false;
+ const utterance = speakNumber(-123, { speechVoice: '', speechRate: 3 }, engine, Utterance, () => {}, () => { finished = true; });
+ assert.equal(utterance.text, 'minus 123');
+ assert.equal(finished, false);
+ // Starting/queueing the voice does not count as finishing the number.
+ assert.equal(engine.queue[0], utterance);
+ utterance.onend();
+ assert.equal(finished, true);
+});
+
 test('signed numbers, repeated numbers and zero are read without accumulating a queue', () => {
  const engine = speechEngine();
  for (const [value, text] of [[-24, 'minus 24'], [24, '24'], [24, '24'], [0, '0'], [999999, '999999']]) {
